@@ -383,11 +383,15 @@ def list_tables(
     }
 
 
-def execute_query(query: str):
+def execute_query(query: str, timeout_seconds: int = None):
     client = create_clickhouse_client()
     try:
         read_only = get_readonly_setting(client)
-        res = client.query(query, settings={"readonly": read_only})
+        settings = {"readonly": read_only}
+        if timeout_seconds:
+            settings["max_execution_time"] = timeout_seconds
+
+        res = client.query(query, settings=settings)
         logger.info(f"Query returned {len(res.result_rows)} rows")
         return {"columns": res.column_names, "rows": res.result_rows}
     except Exception as err:
@@ -399,10 +403,10 @@ def run_select_query(query: str):
     """Run a SELECT query in a ClickHouse database"""
     logger.info(f"Executing SELECT query: {query}")
     try:
-        future = QUERY_EXECUTOR.submit(execute_query, query)
+        timeout_secs = get_mcp_config().query_timeout
+        future = QUERY_EXECUTOR.submit(execute_query, query, timeout_secs)
         try:
-            timeout_secs = get_mcp_config().query_timeout
-            result = future.result(timeout=timeout_secs)
+            result = future.result(timeout=timeout_secs + 1)  # Add buffer for server-side timeout
             # Check if we received an error structure from execute_query
             if isinstance(result, dict) and "error" in result:
                 logger.warning(f"Query failed: {result['error']}")
