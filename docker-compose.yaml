@@ -1,0 +1,20 @@
+services:
+  mcp-clickhouse-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.instance1
+    restart: unless-stopped
+
+  mcp-clickhouse-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    env_file:
+      - .env.instance2
+    restart: unless-stopped
