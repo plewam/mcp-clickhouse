@@ -248,6 +248,92 @@ Note: Make sure to use the full path to the Python executable or the `mcp-clickh
 - `which python3` for the Python executable
 - `which mcp-clickhouse` for the installed script
 
+## Deployment on Ubuntu Server
+
+To run the MCP server on a raw Ubuntu machine (e.g., EC2, VPS):
+
+1. **Install Prerequisites**:
+   Ensure you have `git`, `python3`, and `uv` installed.
+   ```bash
+   sudo apt update && sudo apt install -y git python3 python3-pip
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   source $HOME/.cargo/env
+   ```
+
+2. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/plewam/mcp-clickhouse.git
+   cd mcp-clickhouse
+   ```
+
+3. **Configure Environment**:
+   Create a `.env` file with your ClickHouse credentials.
+   ```bash
+   nano .env
+   ```
+   Paste your configuration:
+   ```env
+   CLICKHOUSE_HOST=your.clickhouse.host
+   CLICKHOUSE_PORT=8443
+   CLICKHOUSE_USER=default
+   CLICKHOUSE_PASSWORD=your_password
+   CLICKHOUSE_SECURE=true
+   ```
+
+4. **Run the Server**:
+   You can run the server directly with `uv`.
+   ```bash
+   # Run with stdio transport (for use with MCP clients/inspectors via SSH/remote)
+   uv run python -m mcp_clickhouse.main
+
+   # OR run with HTTP transport (for external access)
+   # Make sure to allow port 8000 in your firewall (ufw allow 8000)
+   CLICKHOUSE_MCP_SERVER_TRANSPORT=http CLICKHOUSE_MCP_BIND_HOST=0.0.0.0 uv run python -m mcp_clickhouse.main
+   ```
+
+5. **Run as Systemd Service (Optional)**:
+   To keep the server running in the background and restart automatically:
+
+   a. **Modify .env for HTTP Transport**:
+      Add these lines to your `.env` file to enable HTTP transport:
+      ```env
+      CLICKHOUSE_MCP_SERVER_TRANSPORT=http
+      CLICKHOUSE_MCP_BIND_HOST=0.0.0.0
+      CLICKHOUSE_MCP_BIND_PORT=8000
+      ```
+
+   b. **Create Service File**:
+      ```bash
+      sudo nano /etc/systemd/system/mcp-clickhouse.service
+      ```
+      Paste the following configuration (adjust paths and user as needed):
+      ```ini
+      [Unit]
+      Description=MCP ClickHouse Server
+      After=network.target
+
+      [Service]
+      Type=simple
+      User=root
+      WorkingDirectory=/root/mcp-clickhouse
+      EnvironmentFile=/root/mcp-clickhouse/.env
+      # Path to uv might vary. Check with `which uv`
+      ExecStart=/root/.local/uv run python -m mcp_clickhouse.main
+      Restart=always
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+      ```
+
+   c. **Enable and Start**:
+      ```bash
+      sudo systemctl daemon-reload
+      sudo systemctl enable mcp-clickhouse
+      sudo systemctl start mcp-clickhouse
+      sudo systemctl status mcp-clickhouse
+      ```
+
 ## Development
 
 1. In `test-services` directory run `docker compose up -d` to start the ClickHouse cluster.
